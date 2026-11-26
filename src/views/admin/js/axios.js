@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { guardRestRequest } from './rest-request-guard';
+import { tunnelRestMethod } from './rest-method-tunnel';
 
 // Simpler version of the i18n plugin to translate error feedback messages
 const i18nGet = function (key) {
@@ -67,28 +68,7 @@ tainacanApi.interceptors.response.use(
     (response) => response,
     (error) => tainacanErrorHandler(error)
 );
-// This Axios version runs request interceptors in reverse registration order, so
-// the guard registered below runs before this rewrite. tainacanTunneledMethod lets
-// the guard accept this _method if a later Axios version runs interceptors in
-// registration order instead. See https://developer.wordpress.org/rest-api/using-the-rest-api/global-parameters/#method
-tainacanApi.interceptors.request.use((config) => {
-    const tunnelingMethods = ['put', 'patch', 'delete'];
-  
-    if (config.method && tunnelingMethods.includes(config.method.toLowerCase())) {
-      const originalMethod = config.method.toUpperCase();
-  
-      // Force request to POST
-      config.method = 'post';
-      config.tainacanTunneledMethod = originalMethod;
-  
-      // Add _method param to URL
-      const url = new URL(config.url, window.location.origin);
-      url.searchParams.set('_method', originalMethod);
-      config.url = url.pathname + url.search;
-    }
-  
-    return config;
-});
+tainacanApi.interceptors.request.use(tunnelRestMethod);
 tainacanApi.interceptors.request.use(guardRestRequest);
 
 // WordPress JSON API axios
@@ -102,26 +82,7 @@ wpApi.interceptors.response.use(
     (response) => response,
     (error) => tainacanErrorHandler(error)
 );
-// Same tunneling as tainacanApi. The guard accepts _method only when
-// tainacanTunneledMethod was set here.
-wpApi.interceptors.request.use((config) => {
-    const tunnelingMethods = ['put', 'patch', 'delete'];
-  
-    if (config.method && tunnelingMethods.includes(config.method.toLowerCase())) {
-      const originalMethod = config.method.toUpperCase();
-  
-      // Force request to POST
-      config.method = 'post';
-      config.tainacanTunneledMethod = originalMethod;
-  
-      // Add _method param to URL
-      const url = new URL(config.url, window.location.origin);
-      url.searchParams.set('_method', originalMethod);
-      config.url = url.pathname + url.search;
-    }
-  
-    return config;
-});
+wpApi.interceptors.request.use(tunnelRestMethod);
 wpApi.interceptors.request.use(guardRestRequest);
 
 // WordPress AJAX axios
